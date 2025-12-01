@@ -122,7 +122,7 @@ def display_prediction(title, prediction):
     # Show all probabilities
     with st.expander("📊 See detailed probabilities"):
         for cls, prob in prediction['probabilities'].items():
-            st.progress(prob / 100)
+            st.progress(float(prob) / 100.0)
             st.write(f"**{cls}**: {prob:.1f}%")
 
 # Main app
