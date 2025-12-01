@@ -28,6 +28,7 @@ st.markdown("""
         border-radius: 10px;
         margin: 1rem 0;
         text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     .ripe {
         background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
@@ -40,6 +41,12 @@ st.markdown("""
     .over-ripe {
         background: linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%);
         color: #fff;
+    }
+    .model-selector {
+        background: #f0f2f6;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -121,7 +128,7 @@ def display_prediction(title, prediction):
 # Main app
 def main():
     st.title("🍌 Saba Banana Ripeness Detector")
-    st.markdown("### Upload a photo to check if your banana is ripe!")
+    st.markdown("### Choose your detection mode and upload a photo!")
     
     # Load models
     with st.spinner("Loading AI models..."):
@@ -133,6 +140,20 @@ def main():
         return
     
     st.success("✅ Models loaded successfully!")
+    
+    # Model Selection
+    st.markdown("---")
+    st.markdown('<div class="model-selector">', unsafe_allow_html=True)
+    st.markdown("### 🎯 Select Detection Mode")
+    
+    detection_mode = st.radio(
+        "Choose the model based on your banana type:",
+        options=["🍌 Single Banana (Individual Model)", 
+                 "🍌🍌 Banana Bunch (Bunch Model)", 
+                 "🔄 Compare Both Models"],
+        help="Individual Model: Best for single bananas\nBunch Model: Best for multiple bananas\nCompare Both: See results from both models side by side"
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Image upload options
     st.markdown("---")
@@ -157,42 +178,68 @@ def main():
         # Predict button
         if st.button("🔍 ANALYZE RIPENESS", type="primary"):
             with st.spinner("Analyzing banana ripeness..."):
-                # Get predictions from both models
-                individual_pred = predict_ripeness(individual_model, image)
-                bunch_pred = predict_ripeness(bunch_model, image)
-                
                 st.markdown("---")
                 st.markdown("## 📊 Results")
                 
-                # Display predictions side by side
-                col1, col2 = st.columns(2)
-                
-                with col1:
+                # Individual Model Only
+                if detection_mode == "🍌 Single Banana (Individual Model)":
+                    individual_pred = predict_ripeness(individual_model, image)
                     display_prediction("🍌 Individual Banana Model", individual_pred)
+                    
+                    # Recommendation
+                    st.markdown("---")
+                    st.markdown("### 💡 Recommendation")
+                    provide_recommendation(individual_pred['class'])
                 
-                with col2:
+                # Bunch Model Only
+                elif detection_mode == "🍌🍌 Banana Bunch (Bunch Model)":
+                    bunch_pred = predict_ripeness(bunch_model, image)
                     display_prediction("🍌🍌 Bunch Model", bunch_pred)
+                    
+                    # Recommendation
+                    st.markdown("---")
+                    st.markdown("### 💡 Recommendation")
+                    provide_recommendation(bunch_pred['class'])
                 
-                # Recommendation
-                st.markdown("---")
-                st.markdown("### 💡 Recommendation")
-                
-                # Use average confidence of both models
-                avg_class = individual_pred['class']
-                
-                if avg_class == 'NOT RIPE':
-                    st.info("🟢 **NOT RIPE**: Your banana needs more time to ripen. Wait a few more days!")
-                elif avg_class == 'RIPE':
-                    st.success("🟡 **RIPE**: Perfect! Your banana is ready to eat. Enjoy!")
+                # Compare Both Models
                 else:
-                    st.warning("🔴 **OVER RIPE**: Your banana is very ripe. Best for banana bread or smoothies!")
+                    individual_pred = predict_ripeness(individual_model, image)
+                    bunch_pred = predict_ripeness(bunch_model, image)
+                    
+                    # Display predictions side by side
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        display_prediction("🍌 Individual Banana Model", individual_pred)
+                    
+                    with col2:
+                        display_prediction("🍌🍌 Bunch Model", bunch_pred)
+                    
+                    # Model Agreement Analysis
+                    st.markdown("---")
+                    st.markdown("### 🔍 Model Agreement Analysis")
+                    
+                    if individual_pred['class'] == bunch_pred['class']:
+                        avg_confidence = (individual_pred['confidence'] + bunch_pred['confidence']) / 2
+                        st.success(f"✅ **Both models agree!** Prediction: **{individual_pred['class']}** (Average Confidence: {avg_confidence:.1f}%)")
+                    else:
+                        st.warning(f"⚠️ **Models disagree:**\n- Individual Model: {individual_pred['class']} ({individual_pred['confidence']:.1f}%)\n- Bunch Model: {bunch_pred['class']} ({bunch_pred['confidence']:.1f}%)")
+                        st.info("💡 Tip: Use the model that matches your banana type (single vs bunch) for more accurate results.")
+                    
+                    # Recommendation based on higher confidence
+                    st.markdown("---")
+                    st.markdown("### 💡 Recommendation")
+                    if individual_pred['confidence'] > bunch_pred['confidence']:
+                        provide_recommendation(individual_pred['class'])
+                    else:
+                        provide_recommendation(bunch_pred['class'])
         
         # Reset button
         if st.button("🔄 Analyze Another Banana"):
             st.rerun()
     
     else:
-        st.info("👆 Please take a photo or upload an image to get started!")
+        st.info("👆 Please select a detection mode, then take a photo or upload an image to get started!")
     
     # Footer
     st.markdown("---")
@@ -203,6 +250,15 @@ def main():
             <p>📱 Works on mobile phones | 🌐 Deploy anywhere with Streamlit</p>
         </div>
     """, unsafe_allow_html=True)
+
+def provide_recommendation(ripeness_class):
+    """Provide recommendation based on ripeness class"""
+    if ripeness_class == 'NOT RIPE':
+        st.info("🟢 **NOT RIPE**: Your banana needs more time to ripen. Wait a few more days!")
+    elif ripeness_class == 'RIPE':
+        st.success("🟡 **RIPE**: Perfect! Your banana is ready to eat. Enjoy!")
+    else:
+        st.warning("🔴 **OVER RIPE**: Your banana is very ripe. Best for banana bread or smoothies!")
 
 if __name__ == "__main__":
     main()
